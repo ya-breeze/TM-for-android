@@ -19,7 +19,9 @@ public class SyncActivity extends Activity implements OnClickListener {
 	private Handler uiCallback = new Handler() {
 		@Override
 		public void handleMessage(Message msg) {
-			viewLog.setText( msg.getData().getString("text") );
+			String text = msg.getData().getString("text");
+			viewLog.setText( text );
+			Log.d(TAG, "got message: " + text);
 
 			if( msg.what==SyncThread.Events.FINISHED.ordinal() )
 			{

@@ -10,6 +10,13 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import android.os.Bundle;
 import android.os.Handler;
@@ -41,8 +48,15 @@ public class SyncThread extends Thread {
 
 	@Override
 	public void run() {
-		HttpClient client = new DefaultHttpClient();
-		HttpGet request = new HttpGet("http://192.168.7.45");
+		int TIMEOUT_MILLISEC = 10000; //=10sec
+		 HttpParams httpParams = new BasicHttpParams();;
+		 HttpConnectionParams.setConnectionTimeout(httpParams, TIMEOUT_MILLISEC);
+		 HttpConnectionParams.setSoTimeout(httpParams, TIMEOUT_MILLISEC);
+		 
+		HttpClient client = new DefaultHttpClient(httpParams);
+		String url = "http://192.168.7.45/json";
+		Log.d(TAG, "Getting from server - " + url);
+		HttpGet request = new HttpGet(url);
 //		request.setHeader("User-Agent", sUserAgent);
 
 		try {
@@ -53,8 +67,8 @@ public class SyncThread extends Thread {
 			StatusLine status = response.getStatusLine();
 			inform(status.toString(), Events.TEXT);
 			if (status.getStatusCode() != HTTP_STATUS_OK) {
-//				throw new ApiException("Invalid response from server: "
-//						+ status.toString());
+				inform( "Invalid response from server: " + status.toString(), Events.FINISHED );
+				return;
 			}
 
 			// Pull content stream from response
@@ -70,13 +84,28 @@ public class SyncThread extends Thread {
 			}
 
 			// Return result from buffered stream
-			inform( new String(content.toByteArray()), Events.FINISHED );
+			inform( new String(content.toByteArray()), Events.TEXT );
 //			 new String(content.toByteArray());
+            // Drill into the JSON response to find the content body
+            JSONObject resp = (JSONObject) new JSONTokener(content.toString()).nextValue();
+//            JSONObject query = resp.getJSONObject("uuid");
+//            JSONObject pages = query.getJSONObject("pages");
+//            JSONObject page = pages.getJSONObject((String) pages.keys().next());
+//            JSONArray revisions = page.getJSONArray("revisions");
+//            JSONObject revision = revisions.getJSONObject(0);
+			String uuid = resp.getString("uuid");
+			inform( uuid, Events.FINISHED );
 		} catch (IOException e) {
 			Log.e(TAG, e.toString());
 			inform( "Error on syncing" + e.toString(), Events.FINISHED );
 			e.printStackTrace();
-//			throw new ApiException("Problem communicating with API", e);
+		} catch (JSONException e) {
+			Log.e(TAG, e.toString());
+			inform( "Error on syncing" + e.toString(), Events.FINISHED );
+			e.printStackTrace();
 		}
 	}
+	
+//	String - uuid, int - current time getServerInfo(String _url) {
+//	}
 }
