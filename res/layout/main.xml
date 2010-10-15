@@ -4,9 +4,8 @@
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     android:gravity="center">
-<TextView  
-    android:layout_width="fill_parent" 
-    android:layout_height="wrap_content" android:text="TM demo" android:gravity="center" android:textSize="20sp" android:padding="20dp"/>
+<EditText android:id="@+id/urlView"
+    android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="192.168.7.45:80"/>
 <Button android:layout_width="fill_parent" android:layout_height="wrap_content" android:id="@+id/buttonStart" android:text="Start"></Button>
 <Button android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="Stop" android:id="@+id/buttonStop"></Button>
 <TextView android:id="@+id/viewLog"

@@ -1,6 +1,9 @@
 package ruilko.tm;
 
+import java.util.UUID;
+
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -8,6 +11,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 
 public class SyncActivity extends Activity implements OnClickListener {
@@ -15,6 +19,9 @@ public class SyncActivity extends Activity implements OnClickListener {
 	Button buttonStart, buttonStop;
 	TextView viewLog;
 	SyncThread syncing;
+	EditText urlView;
+	
+	String localUuid;
 
 	private Handler uiCallback = new Handler() {
 		@Override
@@ -43,11 +50,19 @@ public class SyncActivity extends Activity implements OnClickListener {
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+
+		// Restore preferences
+		SharedPreferences settings = getSharedPreferences("tm", 0);
+		localUuid = settings.getString("localUuid", UUID.randomUUID().toString());
+		
+		
+		// Widgets
 		setContentView(R.layout.main);
 
 		buttonStart = (Button) findViewById(R.id.buttonStart);
 		buttonStop = (Button) findViewById(R.id.buttonStop);
 		viewLog = (TextView) findViewById(R.id.viewLog);
+		urlView = (EditText) findViewById(R.id.urlView);
 
 		buttonStart.setOnClickListener(this);
 		buttonStop.setOnClickListener(this);
@@ -66,7 +81,7 @@ public class SyncActivity extends Activity implements OnClickListener {
 			
 			viewLog.setText( "Starting sync thread..." );
 
-			syncing = new SyncThread(uiCallback);
+			syncing = new SyncThread(uiCallback, urlView.getText().toString(), localUuid);
 			syncing.start();
 			// startService(new Intent(this, ServiceImpl.class));
 			break;
