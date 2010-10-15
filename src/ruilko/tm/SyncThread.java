@@ -1,7 +1,10 @@
 package ruilko.tm;
 
 import java.net.URI;
+import java.util.HashMap;
+import java.util.Iterator;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
@@ -15,14 +18,17 @@ public class SyncThread extends Thread implements MessageCallback {
 	
 	private Handler handler;
 	private String host;
+	private int port;
 	private String localUuid;
-	private DbAccessor dbAccessor;
 	private HttpGetter httpGetter;
+	private DbAccessor dbAccessor;
 	
-	public SyncThread(Handler _handler, String _host, String _localUuid) {
+	public SyncThread(DbAccessor _dbAccessor, Handler _handler, String _host, int _port, String _localUuid) {
 		handler = _handler;
 		host = _host;
+		port = _port;
 		localUuid = _localUuid;
+		dbAccessor = _dbAccessor;
 		
 		httpGetter = new HttpGetter(this);
 	}
@@ -57,13 +63,25 @@ public class SyncThread extends Thread implements MessageCallback {
 //			inform("Error on syncing" + e.toString(), Events.FINISHED);
 //			e.printStackTrace();
 		try {
-			String uuid = getRemoteUuid();
-			inform(uuid, Events.FINISHED);
+	        Long now = Long.valueOf(System.currentTimeMillis());
+
+	        // Get remote Uuid and it's lastUpdated time
+	        Pair<String, Long> remoteInfo = getRemoteInfo();
+			inform(remoteInfo.getFirst(), Events.TEXT);
+			Long lastUpdated = dbAccessor.getLastUpdated(remoteInfo.getFirst());
+			inform(lastUpdated.toString(), Events.TEXT);
+			
+			// TODO Upload local updates
+
+			// Download remote updates
+			getRemoteUpdates(lastUpdated);
+			
 		} catch (Exception e) {
 			Log.e(TAG, e.toString());
-			inform("Error on syncing" + e.toString(), Events.FINISHED);
+			inform("Error on syncing " + e.toString(), Events.FINISHED);
 			e.printStackTrace();
 		}
+		inform("Finished", Events.FINISHED);
 	}
 
 	@Override
@@ -71,16 +89,44 @@ public class SyncThread extends Thread implements MessageCallback {
 		inform(msg, Events.TEXT);
 	}
 	
-	private String getRemoteUuid() throws Exception {
+	/**
+	 * @return pair<uuid of server, last updated time on server - i.e. FROM time for uploading local tasks>
+	 * @throws Exception
+	 */
+	private Pair<String, Long> getRemoteInfo() throws Exception {
 		String uuid;
-		URI uri = new URI("http", host, "/get_uuid", null);
-		String content = httpGetter.getResponse(uri, null, null);
+		URI uri = new URI("http", null, host, port, "/get_uuid", null, null);
+		HashMap<String, String> headers = new HashMap<String, String>();
+		headers.put( "Uuid", localUuid );
+		String content = httpGetter.getResponse(uri, headers, null);
 		
 		// Drill into the JSON response to find the content body
 		JSONObject resp = (JSONObject) new JSONTokener(content).nextValue();
 		uuid = resp.getString("uuid");
+		Long lastUpdated = resp.getLong("lastUpdated");
 
-		inform("Server UUID is " + uuid, Events.TEXT);
+		inform("Server UUID:last updated" + uuid + ":" + lastUpdated.toString(), Events.TEXT);
+
+		Pair<String, Long> result = new Pair<String, Long>(uuid, lastUpdated);
+		return result;
+	}
+
+	private String getRemoteUpdates(Long fromTime) throws Exception {
+		String uuid = "123";
+		URI uri = new URI("http", null, host, port, "/get_updates", "fromTime="+fromTime.toString(), null);
+		String content = httpGetter.getResponse(uri, null, null);
+		
+		// Drill into the JSON response to find the content body
+		JSONObject updates = (JSONObject) new JSONTokener(content).nextValue();
+		Log.d(TAG, "Got JSON from server:");
+		Log.d(TAG, updates.toString());
+		if( updates.has("tasks") ) {
+			JSONArray tasks = updates.getJSONArray("tasks");
+			for(int i=0; i<tasks.length(); ++i) {
+				JSONObject task = tasks.getJSONObject(i);
+				Log.d(TAG, "get task JSON");
+			}
+		}
 
 		return uuid;
 	}

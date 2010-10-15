@@ -48,12 +48,13 @@ public class HttpGetter {
 		HttpConnectionParams.setSoTimeout(httpParams, TIMEOUT_MILLISEC);
 		HttpClient client = new DefaultHttpClient(httpParams);
 		HttpGet request = new HttpGet(url);
-        for ( Map.Entry<String, String> entry : headers.entrySet() )
-        {
-	        String key = entry.getKey();
-	        String value = entry.getValue();
-			request.setHeader(key, value);
-        }
+		if( headers!=null )
+	        for ( Map.Entry<String, String> entry : headers.entrySet() )
+	        {
+		        String key = entry.getKey();
+		        String value = entry.getValue();
+				request.setHeader(key, value);
+	        }
         // TODO Adding body
 
 		try {

@@ -19,19 +19,20 @@ public class SyncActivity extends Activity implements OnClickListener {
 	Button buttonStart, buttonStop;
 	TextView viewLog;
 	SyncThread syncing;
-	EditText urlView;
-	
+	EditText hostView;
+	EditText portView;
+	private DbAccessor dbAccessor;
+
 	String localUuid;
 
 	private Handler uiCallback = new Handler() {
 		@Override
 		public void handleMessage(Message msg) {
 			String text = msg.getData().getString("text");
-			viewLog.setText( text );
+			viewLog.setText(text);
 			Log.d(TAG, "got message: " + text);
 
-			if( msg.what==SyncThread.Events.FINISHED.ordinal() )
-			{
+			if (msg.what == SyncThread.Events.FINISHED.ordinal()) {
 				Log.e(TAG, "Thread is stopped");
 				buttonStart.setEnabled(true);
 				buttonStop.setEnabled(false);
@@ -46,6 +47,21 @@ public class SyncActivity extends Activity implements OnClickListener {
 		}
 	};
 
+	@Override
+	protected void onDestroy() {
+		super.onDestroy();
+		if( syncing!=null ) {
+			try {
+				syncing.interrupt();
+				syncing.join();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		dbAccessor.close();
+	}
+
 	/** Called when the activity is first created. */
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -53,22 +69,26 @@ public class SyncActivity extends Activity implements OnClickListener {
 
 		// Restore preferences
 		SharedPreferences settings = getSharedPreferences("tm", 0);
-		localUuid = settings.getString("localUuid", UUID.randomUUID().toString());
-		
-		
+		localUuid = settings.getString("localUuid", UUID.randomUUID()
+				.toString());
+
 		// Widgets
 		setContentView(R.layout.main);
 
 		buttonStart = (Button) findViewById(R.id.buttonStart);
 		buttonStop = (Button) findViewById(R.id.buttonStop);
 		viewLog = (TextView) findViewById(R.id.viewLog);
-		urlView = (EditText) findViewById(R.id.urlView);
+		hostView = (EditText) findViewById(R.id.hostView);
+		portView = (EditText) findViewById(R.id.portView);
 
 		buttonStart.setOnClickListener(this);
 		buttonStop.setOnClickListener(this);
 
 		buttonStart.setEnabled(true);
 		buttonStop.setEnabled(false);
+		
+		// Create Db object
+		dbAccessor = new DbAccessor(this);
 	}
 
 	@Override
@@ -78,26 +98,31 @@ public class SyncActivity extends Activity implements OnClickListener {
 			Log.d(TAG, "onClick: starting sync");
 			buttonStart.setEnabled(false);
 			buttonStop.setEnabled(true);
-			
-			viewLog.setText( "Starting sync thread..." );
 
-			syncing = new SyncThread(uiCallback, urlView.getText().toString(), localUuid);
+			viewLog.setText("Starting sync thread...");
+			int port = 0;
+			try {
+				port = Integer.parseInt(portView.getText().toString());
+			}
+			catch(NumberFormatException e) {
+				Log.e(TAG, "Wrong port - " + portView.getText().toString());
+			}
+			syncing = new SyncThread(dbAccessor, uiCallback, hostView.getText().toString(),
+					port, localUuid);
 			syncing.start();
-			// startService(new Intent(this, ServiceImpl.class));
 			break;
 		case R.id.buttonStop:
 			Log.d(TAG, "onClick: stopping sync");
 			buttonStart.setEnabled(true);
 			buttonStop.setEnabled(false);
 
-			viewLog.setText( "Stopping sync thread..." );
+			viewLog.setText("Stopping sync thread...");
 			try {
 				syncing.interrupt();
 				syncing.join();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
-			}			
-			// stopService(new Intent(this, ServiceImpl.class));
+			}
 			break;
 		}
 	}

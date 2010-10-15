@@ -9,7 +9,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 public class DbAccessor { 
 
 	private class DbSqlite extends SQLiteOpenHelper {
-		static final String DATABASE_NAME = "/sdcard/.tm.sqlite";
+		static final String DATABASE_NAME = "tm.sqlite";
 		static final int DATABASE_VERSION = 1;
 	
 		DbSqlite(Context context) {
@@ -51,10 +51,23 @@ public class DbAccessor {
 
 	private DbSqlite dbAccessor;
 	
+	public DbAccessor(Context context) {
+		dbAccessor = new DbSqlite(context);
+	}
+	public void close() {
+		dbAccessor.close();
+	}
+	
 	public Long getLastUpdated(String _uuid) {
+		Long result;
+		
 		SQLiteDatabase db = dbAccessor.getReadableDatabase();
 		Cursor c = db.query("Hosts", null, "lastUpdated", null, null, null, null, null);
-		Long result = c.getLong(1);
+		if( c.moveToFirst()==false )
+			result = (long) 0;
+		else
+			result = c.getLong(1);
+		
 		c.close();
 		return result;		
 	}
