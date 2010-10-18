@@ -1,8 +1,8 @@
 package ruilko.tm;
 
 import java.net.URI;
+import java.security.InvalidKeyException;
 import java.util.HashMap;
-import java.util.Iterator;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -34,7 +34,7 @@ public class SyncThread extends Thread implements MessageCallback {
 	}
 
 	public enum Events {
-		DEBUG, TEXT, FINISHED
+		DEBUG, TEXT, FINISHED, ERROR
 	}
 
 	void inform(String _text, Events _event) {
@@ -63,7 +63,9 @@ public class SyncThread extends Thread implements MessageCallback {
 //			inform("Error on syncing" + e.toString(), Events.FINISHED);
 //			e.printStackTrace();
 		try {
+			dbAccessor.beginTransaction();
 	        Long now = Long.valueOf(System.currentTimeMillis());
+	        Log.d(TAG, "Sync started at " + now.toString());
 
 	        // Get remote Uuid and it's lastUpdated time
 	        Pair<String, Long> remoteInfo = getRemoteInfo();
@@ -74,14 +76,18 @@ public class SyncThread extends Thread implements MessageCallback {
 			// TODO Upload local updates
 
 			// Download remote updates
-			getRemoteUpdates(lastUpdated);
-			
+			processRemoteUpdates(lastUpdated);
+
+			dbAccessor.setTransactionSuccessful();			
+
+			inform("Finished", Events.FINISHED);
 		} catch (Exception e) {
 			Log.e(TAG, e.toString());
-			inform("Error on syncing " + e.toString(), Events.FINISHED);
+			inform("Error on syncing " + e.toString(), Events.ERROR);
 			e.printStackTrace();
+		} finally {
+			dbAccessor.endTransaction();
 		}
-		inform("Finished", Events.FINISHED);
 	}
 
 	@Override
@@ -111,8 +117,7 @@ public class SyncThread extends Thread implements MessageCallback {
 		return result;
 	}
 
-	private String getRemoteUpdates(Long fromTime) throws Exception {
-		String uuid = "123";
+	private void processRemoteUpdates(Long fromTime) throws Exception {
 		URI uri = new URI("http", null, host, port, "/get_updates", "fromTime="+fromTime.toString(), null);
 		String content = httpGetter.getResponse(uri, null, null);
 		
@@ -123,11 +128,39 @@ public class SyncThread extends Thread implements MessageCallback {
 		if( updates.has("tasks") ) {
 			JSONArray tasks = updates.getJSONArray("tasks");
 			for(int i=0; i<tasks.length(); ++i) {
-				JSONObject task = tasks.getJSONObject(i);
+				JSONObject json = tasks.getJSONObject(i);
 				Log.d(TAG, "get task JSON");
+				Log.d(TAG, json.toString());
+				
+				Task task = new Task();
+				task.fromJson(json);
+				updateTask(task);
 			}
 		}
-
-		return uuid;
+	}
+	
+	private void updateTask(Task task) {
+		boolean needUpdate = false;
+		Task remote = new Task(task);
+		try {
+			dbAccessor.getDbObject(task, task.getUuid());
+		} catch (InvalidKeyException e) {
+			Log.d(TAG, "There are no local task " + task.getUuid());
+			needUpdate = true;
+		}
+		if( !needUpdate && remote.getGlobalUpdated()>task.getGlobalUpdated() ) {
+			needUpdate = true;
+			Log.d(TAG, "Local task is too old - " + task.getUuid());
+		}
+		
+		if( needUpdate ) {
+			Log.d(TAG, "Should update task " + remote.getUuid());
+			dbAccessor.setDbObject(remote);
+		}
+		else
+		{
+			Log.d(TAG, "Should NOT update task " + remote.getUuid());
+			Log.d(TAG, "Local task - " + task.toString());
+		}
 	}
 }

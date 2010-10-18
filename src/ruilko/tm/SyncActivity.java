@@ -32,7 +32,7 @@ public class SyncActivity extends Activity implements OnClickListener {
 			viewLog.setText(text);
 			Log.d(TAG, "got message: " + text);
 
-			if (msg.what == SyncThread.Events.FINISHED.ordinal()) {
+			if (msg.what == SyncThread.Events.FINISHED.ordinal() || msg.what == SyncThread.Events.ERROR.ordinal()) {
 				Log.e(TAG, "Thread is stopped");
 				buttonStart.setEnabled(true);
 				buttonStop.setEnabled(false);
